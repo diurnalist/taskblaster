@@ -1,0 +1,32 @@
+from trello import TrelloClient
+from itertools import chain
+
+class TrelloBoard:
+    def __init__(self, api_key=None, api_secret=None, board=None):
+        self.client = TrelloClient(
+            api_key=api_key,
+            api_secret=api_secret
+        )
+        self.board = board
+    
+    @property
+    def cards_with_redmine_tickets(self):
+        board = self.client.get_board(self.board)
+        lists = [l for l in board.open_lists() if l.name != "Future Sync"]
+        if not lists:
+            raise ValueError("Could not find any valid open lists")
+        with_tickets = []
+        for c in lists[0].list_cards():
+            ticket = self.redmine_ticket(c)
+            if ticket:
+                with_tickets.append(dict(card=c, ticket=ticket))
+        return with_tickets
+
+
+    def redmine_ticket(self, card):
+        fields = [f for f in card.customFields if f.name == "Redmine Ticket"]
+
+        if fields:
+            return fields[0].value
+        else:
+            return None
