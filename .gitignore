@@ -1,0 +1,6 @@
+# Virtual environment
+.tox/
+# Build files
+__pycache__/
+*.pyc
+*.egg-info
