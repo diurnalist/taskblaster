@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 import pytz
@@ -7,6 +7,7 @@ import sys
 
 from taskblaster.redmine import RedmineProject
 from taskblaster.trello import TrelloBoard
+from taskblaster.util import start_of_today
 
 logging.basicConfig(level=logging.DEBUG)
 requests_log = logging.getLogger("requests.packages.urllib3")
@@ -18,6 +19,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--trello-api-key", default=os.getenv("TRELLO_API_KEY"))
 parser.add_argument("--trello-token", default=os.getenv("TRELLO_TOKEN"))
 parser.add_argument("--trello-board")
+parser.add_argument("--trello-user")
 parser.add_argument("--redmine-url", default=os.getenv("REDMINE_URL"))
 parser.add_argument("--redmine-api-key", default=os.getenv("REDMINE_API_KEY"))
 parser.add_argument("--redmine-project")
@@ -32,23 +34,31 @@ redmine = RedmineProject(url=args.redmine_url,
 
 
 def standup_report():
-    username = 'jasonandersonatuchicago'
-    start_of_today = datetime.utcnow().replace(
-        hour=0, minute=0, second=0, tzinfo=pytz.timezone('America/Chicago'))
+    username = args.trello_user
     report_lines = ['*Today*']
+
+    today = start_of_today()
+    last_week = today - timedelta(days=7)
+
     def format_comment(comm):
         text = comm["data"]["text"]
         return text.replace("\n", " ")
-    for c in trello.cards_for_member(username):
-        if c.date_last_activity > start_of_today:
-            comments = [
+
+    for c in trello.cards_for_member(username, since=last_week):
+        print(f'{c.name} {c.date_last_activity}')
+        if c.date_last_activity > last_week:
+            card_updates = [
                 com for com in c.get_comments()
-                if com['memberCreator']['username'] == username
+                if (com['memberCreator']['username'] == username
+                    and datetime.strptime(com['date'], '%Y-%m-%dT%H:%M:%S.%f%z') > today)
             ]
+            if not card_updates:
+                continue
             report_lines += [
                 f'\n_{c.name}_',
-                *[f'  * {format_comment(comm)}' for comm in comments],
+                *[f'- {format_comment(comm)}' for comm in card_updates],
             ]
+
     print("\n".join(report_lines))
 
 

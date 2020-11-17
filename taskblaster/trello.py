@@ -9,22 +9,21 @@ class TrelloBoard:
         )
         self.board = board
 
-    @property
-    def current_cards(self):
+    def current_cards(self, since=None):
         board = self.client.get_board(self.board)
         lists = [l for l in board.open_lists() if l.name != "Future Sync"]
         if not lists:
             raise ValueError("Could not find any valid open lists")
-        return lists[0].list_cards()
+        return list(chain(*[l.list_cards() for l in lists]))
 
-    def cards_for_member(self, username):
+    def cards_for_member(self, username, since=None):
         board = self.client.get_board(self.board)
         member_id = next(iter([
             m.id for m in board.all_members() if m.username == username
         ]), None)
         if not member_id:
             raise ValueError(f"Member {username} is not part of this board")
-        return [c for c in self.current_cards if member_id in c.member_id]
+        return [c for c in self.current_cards(since=since) if member_id in c.member_id]
 
     @property
     def cards_with_redmine_tickets(self):
