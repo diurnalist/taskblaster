@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime, timedelta
+from itertools import chain
 import logging
 import os
 import pytz
@@ -42,10 +43,13 @@ def standup_report():
 
     def format_comment(comm):
         text = comm["data"]["text"]
-        return text.replace("\n", " ")
+        return [
+            f'- {line.strip().replace("- ", "")}'
+            for line in text.split("\n")
+            if line.strip()
+        ]
 
     for c in trello.cards_for_member(username, since=last_week):
-        print(f'{c.name} {c.date_last_activity}')
         if c.date_last_activity > last_week:
             card_updates = [
                 com for com in c.get_comments()
@@ -56,7 +60,7 @@ def standup_report():
                 continue
             report_lines += [
                 f'\n_{c.name}_',
-                *[f'- {format_comment(comm)}' for comm in card_updates],
+                *chain(*[format_comment(comm) for comm in card_updates]),
             ]
 
     print("\n".join(report_lines))
