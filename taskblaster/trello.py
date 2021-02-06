@@ -13,9 +13,9 @@ class TrelloBoard:
         )
         self.board = board
 
-    def current_cards(self, since=None):
+    def current_cards(self, since=None, future_ok=False):
         board = self.client.get_board(self.board)
-        lists = [l for l in board.open_lists() if l.name != "Future Sync"]
+        lists = [l for l in board.open_lists() if (future_ok or l.name != "Future Sync")]
         if not lists:
             raise ValueError("Could not find any valid open lists")
         all_cards = list(chain(*[l.list_cards() for l in lists]))
@@ -34,7 +34,7 @@ class TrelloBoard:
 
     def cards_with_redmine_tickets(self, since=None):
         with_tickets = []
-        for c in self.current_cards(since=since):
+        for c in self.current_cards(since=since, future_ok=True):
             ticket = self.redmine_ticket(c)
             if ticket:
                 with_tickets.append(dict(card=c, ticket=ticket))
