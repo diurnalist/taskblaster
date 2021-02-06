@@ -48,6 +48,9 @@ class TrelloBoard:
         else:
             return None
 
+    def set_redmine_ticket(self, card, ticket_id):
+        raise NotImplementedError()
+
     def categories(self):
         return [o.value for o in self._category_field.options]
 

@@ -157,13 +157,15 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
         if ticket_ref == "new":
             # 1. Create a new ticket
             ticket = redmine.create_ticket(**to_update_fields(fields))
-            # 2. Update Trello card with ticket #
+            click.echo(f"\nCreated ticket {ticket.id}")
+            # 2. Update Trello card with ticket
+            trello.set_redmine_ticket(card, ticket.id)
             continue
 
         ticket_id = int(ticket_ref)
         ticket = redmine.get_ticket(ticket_id)
 
-        click.echo(f"#{ticket_id}: {ticket.subject}")
+        click.echo(f"\n#{ticket_id}: {ticket.subject}")
         updates = {}
         updates_summary = []
         for field, value in fields.items():
