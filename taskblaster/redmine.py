@@ -6,7 +6,7 @@ class RedmineProject:
     def __init__(self, url=None, api_key=None, project=None):
         self.client = Redmine(url, key=api_key)
         self.project = project
-    
+
     def get_ticket(self, id):
         return self.client.issue.get(id)
 
@@ -18,6 +18,9 @@ class RedmineProject:
 
     def list_categories(self):
         return list(self.client.issue_category.filter(project_id=self.project))
+
+    def list_priorities(self):
+        return list(self.client.enumeration.filter(resource='issue_priorities'))
 
     def list_members(self):
         return list(self.client.project_membership.filter(project_id=self.project))
@@ -31,14 +34,14 @@ class RedmineProject:
             self.client.version.filter(project_id=self.project)
             if v.status == "open"
         ]
-        
+
         due_soonest = None
-        
+
         def is_due_sooner(version):
             due = version.due_date
-            return (due > date.today() and 
+            return (due > date.today() and
                 (not due_soonest or version.due_date < due_soonest.due_date))
-        
+
         for v in open_versions:
             if is_due_sooner(v):
                 due_soonest = v
