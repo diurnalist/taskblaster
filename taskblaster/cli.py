@@ -46,7 +46,7 @@ def cli(ctx, verbose, trello_api_key, trello_token, trello_board):
 
 
 @cli.command("standup-report")
-@click.option("--trello-user", default=os.getenv("TRELLO_USER"))
+@click.argument("trello-user", default=os.getenv("TRELLO_USER"))
 @click.pass_context
 def standup_report(ctx, trello_user):
     username = trello_user
