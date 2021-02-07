@@ -11,7 +11,11 @@ class RedmineProject:
         return self.client.issue.get(id)
 
     def create_ticket(self, **fields):
-        return self.client.issue.create(**fields)
+        create_fields = {
+            **fields,
+            'project_id': self.project,
+        }
+        return self.client.issue.create(**create_fields)
 
     def update_ticket(self, id, **fields):
         return self.client.issue.update(id, **fields)

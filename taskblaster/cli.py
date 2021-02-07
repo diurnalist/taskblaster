@@ -125,7 +125,6 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
             # Always mark High
             priority=high_priority,
             category=redmine_category,
-            fixed_version=version,
             # TODO: if checklist, calculate % done
             # done_ratio=0
         )
@@ -154,12 +153,15 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
                     f"'{trello_user.full_name}'"))
             fields["assigned_to"] = redmine_member
 
+        if not trello.card_is_future(card):
+            fields["fixed_version"] = version
+
         if ticket_ref == "new":
-            # 1. Create a new ticket
-            ticket = redmine.create_ticket(**to_update_fields(fields))
-            click.echo(f"\nCreated ticket {ticket.id}")
-            # 2. Update Trello card with ticket
-            trello.set_redmine_ticket(card, ticket.id)
+            click.echo(tabulate(fields.items(), tablefmt="fancy_grid"))
+            if click.confirm("Create this ticket?"):
+                ticket = redmine.create_ticket(**to_update_fields(fields))
+                click.echo(f"\nCreated ticket {ticket.id}")
+                trello.set_redmine_ticket(card, ticket.id)
             continue
 
         ticket_id = int(ticket_ref)
@@ -170,8 +172,9 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
         updates_summary = []
         for field, value in fields.items():
             ticket_value = getattr(ticket, field, None)
-            value_norm = str(value).strip()
-            ticket_value_norm = str(ticket_value).strip()
+            # Normalize line endings
+            value_norm = str(value).strip().replace("\r\n", "\n")
+            ticket_value_norm = str(ticket_value).strip().replace("\r\n", "\n")
             if value_norm == ticket_value_norm:
                 continue
             diff = '\n'.join(list(differ.compare(
@@ -186,6 +189,7 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
             updates_summary.append([field, diff])
 
         if not updates:
+            click.echo(click.style("(skipped, no updates)", fg="bright_black"))
             continue
 
         click.echo(tabulate(updates_summary, tablefmt="fancy_grid"))

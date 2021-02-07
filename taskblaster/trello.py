@@ -2,7 +2,9 @@ from functools import lru_cache
 from itertools import chain
 
 from trello import TrelloClient
-from trello import Board, CustomFieldDefinition, Member
+from trello import Board, Card, CustomFieldDefinition, Member
+
+FUTURE_LIST = "Future Sync"
 
 
 class TrelloBoard:
@@ -15,7 +17,7 @@ class TrelloBoard:
 
     def current_cards(self, since=None, future_ok=False):
         board = self.client.get_board(self.board)
-        lists = [l for l in board.open_lists() if (future_ok or l.name != "Future Sync")]
+        lists = [l for l in board.open_lists() if (future_ok or l.name != FUTURE_LIST)]
         if not lists:
             raise ValueError("Could not find any valid open lists")
         all_cards = list(chain(*[l.list_cards() for l in lists]))
@@ -40,21 +42,18 @@ class TrelloBoard:
                 with_tickets.append(dict(card=c, ticket=ticket))
         return with_tickets
 
-    def redmine_ticket(self, card):
-        fields = [f for f in card.customFields if f.name == "Redmine Ticket"]
+    def redmine_ticket(self, card: "Card"):
+        redmine_ticket_field = card.get_custom_field_by_name("Redmine Ticket")
+        return redmine_ticket_field.value if redmine_ticket_field else None
 
-        if fields:
-            return fields[0].value
-        else:
-            return None
-
-    def set_redmine_ticket(self, card, ticket_id):
-        raise NotImplementedError()
+    def set_redmine_ticket(self, card: "Card", ticket_id):
+        return card.set_custom_field(
+            str(ticket_id), self._redmine_ticket_field)
 
     def categories(self):
         return [o.value for o in self._category_field.options]
 
-    def card_category(self, card) -> str:
+    def card_category(self, card: "Card") -> str:
         custom_field_item = next((
             cf for cf in card.custom_fields
             if cf.definition_id == self._category_field.id
@@ -63,6 +62,9 @@ class TrelloBoard:
             raise ValueError(f"Could not find category for card {card}")
         return custom_field_item.value
 
+    def card_is_future(self, card: "Card") -> bool:
+        return card.get_list().name == FUTURE_LIST
+
     def member(self, member_id):
         return next((m for m in self._members if m.id == member_id), None)
 
@@ -70,12 +72,28 @@ class TrelloBoard:
     @lru_cache(maxsize=1)
     def _category_field(self) -> 'CustomFieldDefinition':
         category_field = next((
-            fd for fd in self._board.get_custom_field_definitions()
-            if fd.name == "Category"
+            field for field in self._custom_fields
+            if field.name.lower() == "category"
         ), None)
         if not category_field:
             raise ValueError("Could not find 'Category' custom field")
         return category_field
+
+    @property
+    @lru_cache(maxsize=1)
+    def _redmine_ticket_field(self) -> 'CustomFieldDefinition':
+        redmine_ticket_field = next((
+            field for field in self._custom_fields
+            if field.name.lower() == "redmine ticket"
+        ), None)
+        if not redmine_ticket_field:
+            raise ValueError("Could not find 'Redmine Ticket' custom field")
+        return redmine_ticket_field
+
+    @property
+    @lru_cache(maxsize=1)
+    def _custom_fields(self):
+        return self._board.get_custom_field_definitions()
 
     @property
     @lru_cache(maxsize=1)
