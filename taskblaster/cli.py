@@ -1,29 +1,15 @@
-from datetime import datetime, timedelta
-from difflib import Differ
 from itertools import chain
 import logging
 import os
 
 import click
 from dateutil.parser import parse as parse_date
-from tabulate import tabulate
 
+from .commands.sync import SyncToRedmineCommand
 from .redmine import RedmineProject
 from .trello import TrelloBoard
 from .util import start_of_today, one_week_ago
 
-
-CATEGORY_MAP = {
-    "Appliances": "Appliances (technical debt)",
-    "Operations": "Systems operations (technical debt)",
-    "Outreach": "Outreach",
-    "Testbed services": "Systems (development)",
-    "User services": "Portal and User Services (technical debt)",
-}
-
-USER_MAP = {
-    "zhenz-uchicago": "Zhuo Zhen",
-}
 
 @click.group()
 @click.option("-v", "--verbose", "verbose", count=True)
@@ -88,116 +74,6 @@ def sync_to_redmine(ctx, redmine_url, redmine_api_key, redmine_project, confirm)
     trello = ctx.obj['trello_client']  # type: TrelloBoard
     redmine = RedmineProject(url=redmine_url, api_key=redmine_api_key,
                              project=redmine_project)
-    differ = Differ()
-
-    high_priority = next(
-        (p for p in redmine.list_priorities() if p.name == "High"), None)
-    if not high_priority:
-        raise ValueError("Could not find Redmine High priority enumeration")
-
-    version = redmine.get_current_version()
-    if not version:
-        raise ValueError("Could not determine current Redmine version")
-
-    categories = redmine.list_categories()
-    members = redmine.list_members()
-
-    all_cards = trello.cards_with_redmine_tickets(since=one_week_ago())
-    click.echo(f"Will process {len(all_cards)} cards.\n")
-
-    for c in all_cards:
-        card = c["card"]  # type: trello.Card
-        ticket_ref = c["ticket"].lower()
-
-        card_category = trello.card_category(card)
-        redmine_category = next((
-            c for c in categories
-            if c.name == CATEGORY_MAP[card_category]
-        ), None)
-        if not redmine_category:
-            raise ValueError((
-                "Could not find Redmine category for Trello category "
-                f"'{card_category}'"))
-
-        fields = dict(
-            subject=card.name,
-            description=card.description,
-            # Always mark High
-            priority=high_priority,
-            category=redmine_category,
-            # TODO: if checklist, calculate % done
-            # done_ratio=0
-        )
-
-        def to_update_fields(fields):
-            updates_with_ids = {}
-            for field, value in fields.items():
-                if hasattr(value, "id"):
-                    updates_with_ids[f"{field}_id"] = value.id
-                else:
-                    updates_with_ids[field] = value
-            return updates_with_ids
-
-        if card.member_id:
-            trello_user = trello.member(card.member_id[0])
-            redmine_member = next((
-                m.user for m in members
-                if m.user.name in [
-                    trello_user.full_name,
-                    USER_MAP.get(trello_user.full_name, "not found")
-                ]
-            ), None)
-            if not redmine_member:
-                raise ValueError((
-                    "Could not find Redmine user for Trello user "
-                    f"'{trello_user.full_name}'"))
-            fields["assigned_to"] = redmine_member
-
-        if not trello.card_is_future(card):
-            fields["fixed_version"] = version
-
-        if ticket_ref == "new":
-            click.echo(tabulate(fields.items(), tablefmt="fancy_grid"))
-            if click.confirm("Create this ticket?"):
-                ticket = redmine.create_ticket(**to_update_fields(fields))
-                click.echo(f"\nCreated ticket {ticket.id}")
-                trello.set_redmine_ticket(card, ticket.id)
-            continue
-
-        ticket_id = int(ticket_ref)
-        ticket = redmine.get_ticket(ticket_id)
-
-        click.echo(f"\n#{ticket_id}: {ticket.subject}")
-        updates = {}
-        updates_summary = []
-        for field, value in fields.items():
-            ticket_value = getattr(ticket, field, None)
-            # Normalize line endings
-            value_norm = str(value).strip().replace("\r\n", "\n")
-            ticket_value_norm = str(ticket_value).strip().replace("\r\n", "\n")
-            if value_norm == ticket_value_norm:
-                continue
-            diff = '\n'.join(list(differ.compare(
-                ticket_value_norm.splitlines(),
-                value_norm.splitlines()
-            )))
-            if confirm:
-                click.echo(tabulate([[field, diff]], tablefmt="plain"))
-                if not click.confirm(f"Apply update to {field}?"):
-                    continue
-            updates[field] = value
-            updates_summary.append([field, diff])
-
-        if not updates:
-            click.echo(click.style("(skipped, no updates)", fg="bright_black"))
-            continue
-
-        click.echo(tabulate(updates_summary, tablefmt="fancy_grid"))
-        if click.confirm("Apply this update?"):
-            updates_with_ids = {}
-            for field, value in updates.items():
-                if hasattr(value, "id"):
-                    updates_with_ids[f"{field}_id"] = value.id
-                else:
-                    updates_with_ids[field] = value
-            redmine.update_ticket(ticket_id, **updates_with_ids)
+    cmd = SyncToRedmineCommand(redmine_client=redmine, trello_client=trello,
+                               confirm=confirm)
+    return cmd.run()
