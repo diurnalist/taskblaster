@@ -8,12 +8,12 @@ Installation
 ============
 
 The package is not currently uploaded to PyPI, so you have to run it locally. There is a ``run.sh`` script that will
-automatically source the virtualenv created by ``make``.
+automatically source the virtualenv created by ``tox`` (which is assumed to be installed.)
 
 .. code-block:: shell
    
    # Create the virtualenv
-   make
+   tox
    # Show the commands available
    ./run.sh --help
 
