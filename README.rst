@@ -9,14 +9,24 @@ Usage
 
 First set up your environment. Create a file at ``.env`` that looks like this::
 
+  # See: https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#authentication-and-authorization
   TRELLO_API_KEY=<trello API key>
   TRELLO_TOKEN=<trello token>
+  # See: https://www.redmine.org/boards/2/topics/53956
   REDMINE_URL=https://collab.tacc.utexas.edu
   REDMINE_USER=<redmine username>
   REDMINE_API_KEY=<redmine API key>
 
 Syncing Trello cards to Redmine
 -------------------------------
+
+The sync command will look at all cards in the most current list, plus the list
+named "Future Sync". It will then look at a custom field called "Redmine Ticket",
+which is expected to contain the Redmine Issue #. If this field has the value
+"new", a new Redmine Issue will be created and the Trello card will be updated with
+the Issue's generated ID. If the field already has a valid ID, the issue will be
+updated with the latest description, assignee, version, priority, and any updates
+will be added to the issue as notes.
 
 .. code-block:: shell
 
