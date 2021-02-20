@@ -29,6 +29,9 @@ class RedmineProject:
     def list_members(self):
         return list(self.client.project_membership.filter(project_id=self.project))
 
+    def list_statuses(self):
+        return list(self.client.issue_status.all())
+
     def get_member(self, id):
         return self.client.user.get(id)
 

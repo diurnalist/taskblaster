@@ -65,6 +65,9 @@ class TrelloBoard:
     def card_is_future(self, card: "Card") -> bool:
         return card.get_list().name == FUTURE_LIST
 
+    def card_is_done(self, card: "Card") -> bool:
+        return any(l.name == "Done" for l in (card.labels or []))
+
     def member(self, member_id):
         return next((m for m in self._members if m.id == member_id), None)
 

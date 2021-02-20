@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from trello import Card
 
 RedmineContext = namedtuple("RedmineContext", [
-    "high_priority", "version", "categories", "members"
+    "high_priority", "version", "status_map", "categories", "members"
 ])
 
 
@@ -142,15 +142,23 @@ class SyncToRedmineCommand(object):
             description=card.description,
             priority=priority,
             category=category,
-            # TODO: if checklist, calculate % done
-            # done_ratio=0
         )
 
         if card.member_id:
             fields["assigned_to"] = self._redmine_member(card)
+            fields["status"] = self.redmine_data.status_map["assigned"]
+        else:
+            fields["assigned_to"] = None
+            fields["status"] = self.redmine_data.status_map["new"]
 
         if not self.trello.card_is_future(card):
             fields["fixed_version"] = self.redmine_data.version
+
+        if self.trello.card_is_done(card):
+            fields["done_ratio"] = 100
+            fields["status"] = self.redmine_data.status_map["done"]
+
+        # TODO: if checklist, calculate % done
 
         return fields
 
@@ -200,12 +208,26 @@ class SyncToRedmineCommand(object):
         if not version:
             raise ValueError("Could not determine current Redmine version")
 
+        status_map = {}
+        for s in self.redmine.list_statuses():
+            status = s.name.lower()
+            if status in ["done", "resolved"]:
+                status_map["done"] = s
+            elif status in ["assigned"]:
+                status_map["assigned"] = s
+            elif status in ["new"]:
+                status_map["new"] = s
+
+        if not status_map:
+            raise ValueError("Could not fill in Redmine status map!")
+
         categories = self.redmine.list_categories()
         members = self.redmine.list_members()
 
         return RedmineContext(
             high_priority=high_priority,
             version=version,
+            status_map=status_map,
             categories=categories,
             members=members
         )
