@@ -5,14 +5,11 @@ from trello import TrelloClient
 from trello import Board, Card, CustomFieldDefinition, Member
 
 FUTURE_LIST = "Future Sync"
-
+FUTURE_BOARD = "Product Roadmap"
 
 class TrelloBoard:
-    def __init__(self, api_key=None, api_secret=None, board=None):
-        self.client = TrelloClient(
-            api_key=api_key,
-            api_secret=api_secret
-        )
+    def __init__(self, client: "TrelloClient", board=None):
+        self.client = client
         self.board = board
 
     def current_cards(self, since=None, future_ok=False):
@@ -63,10 +60,14 @@ class TrelloBoard:
         return custom_field_item.value
 
     def card_is_future(self, card: "Card") -> bool:
-        return card.get_list().name == FUTURE_LIST
+        board = self.client.get_board(self.board)
+        return board.name == FUTURE_BOARD or card.get_list().name == FUTURE_LIST
 
     def card_is_done(self, card: "Card") -> bool:
         return any(l.name == "Done" for l in (card.labels or []))
+
+    def card_is_bug(self, card: "Card") -> bool:
+        return any(l.name == "Bug" for l in (card.labels or []))
 
     def member(self, member_id):
         return next((m for m in self._members if m.id == member_id), None)

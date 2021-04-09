@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from trello import Card
 
 RedmineContext = namedtuple("RedmineContext", [
-    "high_priority", "version", "status_map", "categories", "members"
+    "high_priority", "version", "status_map", "tracker_map", "categories", "members"
 ])
 
 
@@ -53,13 +53,14 @@ class SyncToRedmineCommand(object):
 
         if ticket_ref == "new":
             ticket = self._create_ticket(fields)
-            self.trello.set_redmine_ticket(card, ticket.id)
+            if ticket:
+                self._add_notes(card, ticket)
+                self.trello.set_redmine_ticket(card, ticket.id)
         else:
             ticket_id = int(ticket_ref)
             ticket = self.redmine.get_ticket(ticket_id)  # type: Issue
             self._update_ticket(ticket, fields)
-
-        self._add_notes(card, ticket)
+            self._add_notes(card, ticket)
 
     def _update_ticket(self, ticket: "Issue", fields):
         click.echo(f"\n#{ticket.id}: {ticket.subject}")
@@ -144,6 +145,11 @@ class SyncToRedmineCommand(object):
             category=category,
         )
 
+        if self.trello.card_is_bug(card):
+            fields["tracker"] = self.redmine_data.tracker_map["bug"]
+        else:
+            fields["tracker"] = self.redmine_data.tracker_map["task"]
+
         if card.member_id:
             fields["assigned_to"] = self._redmine_member(card)
             fields["status"] = self.redmine_data.status_map["assigned"]
@@ -151,7 +157,9 @@ class SyncToRedmineCommand(object):
             fields["assigned_to"] = None
             fields["status"] = self.redmine_data.status_map["new"]
 
-        if not self.trello.card_is_future(card):
+        if self.trello.card_is_future(card):
+            fields["fixed_version"] = None
+        else:
             fields["fixed_version"] = self.redmine_data.version
 
         if self.trello.card_is_done(card):
@@ -199,6 +207,17 @@ class SyncToRedmineCommand(object):
         return updates_with_ids
 
     def _redmine_context(self):
+        tracker_map = {}
+        for t in self.redmine.list_trackers():
+            tracker = t.name.lower()
+            if tracker in ["bug"]:
+                tracker_map["bug"] = t
+            elif tracker in ["task"]:
+                tracker_map["task"] = t
+
+        if not tracker_map:
+            raise ValueError("Could not fill in Redmine tracker map!")
+
         high_priority = next(
             (p for p in self.redmine.list_priorities() if p.name == "High"), None)
         if not high_priority:
@@ -227,6 +246,7 @@ class SyncToRedmineCommand(object):
         return RedmineContext(
             high_priority=high_priority,
             version=version,
+            tracker_map=tracker_map,
             status_map=status_map,
             categories=categories,
             members=members

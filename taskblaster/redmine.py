@@ -20,6 +20,9 @@ class RedmineProject:
     def update_ticket(self, id, **fields):
         return self.client.issue.update(id, **fields)
 
+    def list_trackers(self):
+        return list(self.client.tracker.all())
+
     def list_categories(self):
         return list(self.client.issue_category.filter(project_id=self.project))
 
