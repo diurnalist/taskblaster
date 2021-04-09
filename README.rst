@@ -11,7 +11,7 @@ The package is not currently uploaded to PyPI, so you have to run it locally. Th
 automatically source the virtualenv created by ``tox`` (which is assumed to be installed.)
 
 .. code-block:: shell
-   
+
    # Create the virtualenv
    tox
    # Show the commands available
@@ -45,6 +45,9 @@ will be added to the issue as notes.
 .. code-block:: shell
 
    taskblaster sync-to-redmine
+
+   # If syncing multiple boards
+   taskblaster sync-to-redmine --trello-board <board_id> --trello-board <board_id>
 
 Creating a Trello standup report
 --------------------------------
