@@ -48,9 +48,10 @@ class RedmineProject:
         due_soonest = None
 
         def is_due_sooner(version):
-            due = version.due_date
-            return (due > date.today() and
-                (not due_soonest or version.due_date < due_soonest.due_date))
+            due_date = getattr(version, "due_date", None)
+            return due_date is not None and (
+                due_date > date.today() and (
+                    not due_soonest or due_date < due_soonest.due_date))
 
         for v in open_versions:
             if is_due_sooner(v):
